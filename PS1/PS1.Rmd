@@ -1,0 +1,249 @@
+---
+title: "Problem Set 1"
+author: "Written By Yunqiu (Julie) Li, in Autumn 2018"
+knit: (function(inputFile, encoding) { 
+      out_dir <- 'Output';
+      rmarkdown::render(inputFile,
+                        encoding=encoding, 
+                        output_file=file.path(dirname(inputFile), out_dir, 'Pset1.html')) })
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE, warning = FALSE, echo = FALSE}
+# Important: leave this R-script in your code, change only the ---a---, ---b--- r-script when answering the questions.
+# The following sets your working directory to wherever this .Rmd file is saved
+# note, must be included in the setup portion of the .Rmd
+knitr::opts_knit$set(root.dir = getwd())
+# alternatively, you may change working directory manually
+# Note: this only runs when knit, so if try running by hand it will not do anything, best to also change working directory manually
+setwd("~/Desktop/Fall 2018/applied econometrics with R/Julie Problem set 1")
+
+# Clear enviroment before starting 
+remove(list = ls())
+
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org") # run this the first time (only need to once)
+  library(tidyverse) # includes ggplot2 and many more useful libraries
+if(!require(knitr)) install.packages("knitr", repos = "http://cran.us.r-project.org")
+  library(knitr)
+# options(digits=3)
+# theme_update(plot.title = element_text(hjust = 0.5)) # include if feel like centering plot titles
+
+# Notice: Make sure you download the entire folder in Latte as is, such that you save the two datasets in the Input folder.
+# Notice: Make sure you set this folder you download as your working directory if you are running the code by hand.  The knitr::opts_knit$set(root.dir = getwd()) will only set the file location as your working directory when it knits; so again by hand uncomment the following line and change to your specification
+# setwd("C:/user/Documents") # something like this, you can use the file navigator in the bottom right window to set as well.
+
+# read in chapter 3 data: cps_ch3.csv
+CPS92_12 <- read.csv("Input/cps92_12.csv")
+
+# read in chapter 4 data: Growth.csv
+growth <- read.csv("Input/Growth.csv")
+
+# include iris data for template examples
+library(datasets)
+data("iris")
+```
+
+```{r}
+# i. Compute the sample mean for average hourly earnings (AHE) in 1992 and 2012.
+CPS92_12 %>% group_by(year) %>% summarise(mean = mean(ahe))
+```
+The sample mean for average hourly earnings (AHE) in 1992 in 11.6, and the sample mean for average hourly earnings in 2012 is 19.8.
+
+```{r}
+# ii. Compute the sample standard deviation for AHE in 1992 and 2012.
+CPS92_12 %>% group_by(year) %>% summarise(sd = sd(ahe))
+```
+The sample standard deviation for average hourly earnings in 1992 is 5.62, and the sample mean for average hourly earnings in 2012 is 10.69.
+
+```{r}
+# iii. Construct a 95% confidence interval for the population means of AHE in 1992 and 2012.
+CPS92_12 %>% group_by(year) %>% summarise(mean = mean(ahe), se = sd(ahe)/sqrt(n()), CI.lower = mean - 1.96 *se, CI.upper = mean + 1.96*se)
+```
+The 95% confidence interval for average hourly earnings in 1992 is [11.5, 11.7], and the 95% confidence interval for average hourly earnings in 2012 is [19.6, 20.0].
+
+```{r}
+# iv. Construct a 95% confidence interval for the change in the population mean of AHE between 1992 and 2012.
+ahe_1992 <- CPS92_12[CPS92_12$year == 1992, ]$ahe
+ahe_2012 <- CPS92_12[CPS92_12$year == 2012, ]$ahe
+t.test(ahe_1992, ahe_2012, paired = FALSE, alternative = "two.sided", var.equal = FALSE)
+```
+The 95% confidence interval for change in mean of AHE between 1992 and 2012 is [-8.46, -7.91].
+
+## --- b ---
+```{r}
+# In 2012, the value of the Consumer Price Index (CPI) was 229.6. In 1992, the value of the CPI was 140.3. Repeat (a) but use AHE mea- sured in real 2012 dollars ($2012); that is, adjust the 1992 data for the price inflation that occurred between 1992 and 2012.
+adjust_factor = 229.6/140.3
+CPS92_12_adjusted <- CPS92_12 %>% mutate(ahe_real= ifelse(year == 1992, ahe*adjust_factor, ahe))
+CPS92_12_adjusted %>% group_by(year) %>% summarise(mean = mean(ahe_real), se = sd(ahe_real)/sqrt(n()), CI.lower = mean - 1.96 *se, CI.upper = mean + 1.96*se)
+```
+The 95% confidence interval for average hourly earnings(adjusted for price inflation) in 1992 is [18.8, 19.2], and the 95% confidence interval for average hourly earnings in 2012 is [19.6, 20.0].
+
+## --- c ---
+I will use result from b, because b takes into account for price inflation, which demonstrate the real change in workers’ purchasing power from 1992 to 2012.
+
+## --- d ---
+```{r}
+# i. Using the data for 2012: Construct a 95% confidence interval for the mean of AHE for high school graduates.
+CPS92_12 %>% filter(year == 2012,  bachelor == 0) %>% summarise(mean = mean(ahe), se = sd(ahe)/sqrt(n()), CI.lower = mean - 1.96 *se, CI.upper = mean + 1.96*se)
+```
+The 95% confidence interval for the mean of AHE for high school graduates is [15.4, 16.0].
+
+```{r}
+# ii. Construct a 95% confidence interval for the mean of AHE for workers with a college degree.
+CPS92_12 %>% filter(year == 2012,  bachelor == 1) %>% summarise(mean = mean(ahe), se = sd(ahe)/sqrt(n()), CI.lower = mean - 1.96 *se, CI.upper = mean + 1.96*se)
+```
+The 95% confidence interval for the mean of AHE for workers with a colledge degree is [23.1, 23.8].
+
+```{r}
+# iii. Construct a 95% confidence interval for the difference between the two means.
+data_2012 <- filter(CPS92_12, year == 2012)
+ahe_2012_highschool <- data_2012[data_2012$bachelor == 0, ]$ahe
+ahe_2012_colledge <- data_2012[data_2012$bachelor == 1, ]$ahe
+t.test(ahe_2012_highschool, ahe_2012_colledge, paried = FALSE, alternative = "two.side", var.equal = FALSE, mu = 0)
+```
+THE 95% confidence interval for the difference between the two means is [-8.19, -7.30].
+
+## --- e ---
+### Repeat (d) using the 1992 data expressed in $2012.
+```{r}
+# i.Construct a 95% confidence interval for the mean of adjusted AHE for high school graduates.
+CPS92_12_adjusted %>% filter(year == 1992,  bachelor == 0) %>% summarise(mean = mean(ahe_real), se = sd(ahe_real)/sqrt(n()), CI.lower = mean - 1.96 *se, CI.upper = mean + 1.96*se)
+```
+The 95% confidence interval for the  mean of adjusted AHE for high school graduates is [16.1, 16.5].
+
+```{r}
+# i. Construct a 95% confidence interval for the mean of adjusted AHE for workers with a college degree.
+CPS92_12_adjusted %>% filter(year == 1992,  bachelor == 1) %>% summarise(mean = mean(ahe_real), se = sd(ahe_real)/sqrt(n()), CI.lower = mean - 1.96 *se, CI.upper = mean + 1.96*se)
+```
+The 95% confidence interval for the mean of ajusted AHE for workers with a colledge degree is [22.9, 23.6].
+
+```{r}
+# iii. Construct a 95% confidence interval for the difference between the two adjusted means.
+data_1992 <- filter(CPS92_12_adjusted, year == 1992)
+ahe_1992_adjusted_highschool <- data_1992[data_1992$bachelor == 0, ]$ahe_real
+ahe_1992_adjusted_bachelor <- data_1992[data_1992$bachelor == 1, ]$ahe_real
+t.test(ahe_1992_adjusted_highschool, ahe_1992_adjusted_bachelor, paried = FALSE, alternative = "two.side", var.equal = FALSE, mu = 0)
+```
+THE 95% confidence interval for the difference between the two means is [-7.34, -6.51].
+
+## -- f ---
+```{r}
+# i. Did real (inflation-adjusted) wages of high school graduates increase from 1992 to 2012?
+t.test(ahe_1992_adjusted_highschool, ahe_2012_highschool, paired = FALSE, alternative = "less", var.equal = FALSE, mu = 0)
+```
+The p-value is 1, which is far greater than 0.05(5%), so we reject the null hypothesis that there is no change between real wages of high school graduates from 1992 to 2012. Therefore, real (inflation-adjusted) wages of high school graduates increase from 1992 to 2012(alternative hyphothesis).
+```{r}
+# ii.
+t.test(ahe_1992_adjusted_bachelor, ahe_2012_colledge ,paried = FALSE, alternative = "less", var.equal = FALSE, mu = 0)
+```
+The p-value is 0.2, which is greater than 0.05(5%), so we reject the null hypothesis that there is no change between real wages of colledge graduates from 1992 to 2012. Therefore, real (inflation-adjusted) wages of colledge graduates increase from 1992 to 2012(alternative hyphothesis).
+
+```{r}
+# iii.
+gap_1992 =  ahe_1992_adjusted_bachelor - ahe_1992_adjusted_highschool
+gap_2012 = ahe_2012_colledge - ahe_2012_highschool
+t.test(gap_1992, gap_2012, paried = FALSE, alternative = "greater", var.equal = FALSE)
+```
+The p-value is 1, which is far greater than 0.05(5%), so we reject the null hypothesis that there is no change gap between earnings of college and high school graduates. Therefore, gap between earnings of college and high school graduates increases(alternative hyphothesis).
+
+## -- g ---
+```{r}
+# code for beginning the table for question g in E3.1
+# add letter for better idenfitication when spread table later
+CPS92_12$gender <- NA
+CPS92_12$gender[CPS92_12_adjusted$female == "0"] <- "M"; CPS92_12$gender[CPS92_12$female == "1"] <- "F"
+
+# this produces the men and women columns of mean, standard deviation, and count
+table_g <- CPS92_12 %>% filter(bachelor == "0") %>% group_by(year, gender) %>% summarise(mean = mean(ahe), sd = sd(ahe), n = n()) ##high school
+
+mean_difference = c(10.8-8.78, 17.0-13.12) # mean_difference = mean for male - mean for female = M_mean - F_mean
+print(mean_difference) 
+mean_se <- c(sqrt(3.89**2/1876 + 4.87**2/2774), sqrt(6.07**2/1206 + 8.9**2/2279)) #SE of mean = square root of (F_sd^2/F_n + M_sd^2/M_n)
+print(mean_se)
+CI_d_1992 <- c(2.02 - 1.96*0.129, 2.02+1.96*0.129) #95% confidence interval = mean_difference +/- 1.96*mean_se
+print(CI_d_1992)
+CI_d_2012 <- c(3.8 - 1.96*0.256, 3.8 + 1.96*0.256)
+print(CI_d_2012)
+CI <- c("1.77-2.77", "3.3-4.3")
+
+
+
+# now reshape into wide format, to match Table 3.1 in the book
+table_g.wide <- table_g %>% gather(variable, value, -(year:gender)) %>%
+  unite(temp, gender, variable) %>%
+  spread(temp, value)
+
+table_g.wide <- cbind(table_g.wide, MF_mean = mean_difference, MF_SE = mean_se, CI_d = CI)
+
+kable(table_g.wide)
+```
+
+There are notable difference between the results for high school and college graduates.First, we can clearly tell that the hourly wage for college graduates is larger than the hourly wage for high shool graduates. In both cases for colledge graduates and high school graduates, wage for male is greater than wage for female. For 1992, the difference in average wage for male and female who are colledge graduates is 3.44, which is greater than the difference in average wage for male and female who are high shool graduates(2.02). However, for 2012, the difference in average wage for male and female who are colledge graduates is 3.80, which is less than the difference in average wage for male and female who are high shool graduates(3.88). 
+
+
+
+# EE4.1 - Problem 6
+## --- a ---
+```{r}
+plot <- ggplot(growth, aes(x = tradeshare, y = growth)) + geom_point() + labs(x = "Share of Trade", y = "Growth") 
+plot # display plot
+```
+
+Based on the scatter plot above, it appears that there is a positive relationship between growth and tradeshare. As tradeshare increases, growth increases.
+
+## --- b ---
+```{r}
+plot_withMarlainred <- ggplot(growth, aes( x = tradeshare, y = growth)) + geom_point() + geom_point(data=growth[growth$country_name == "Malta",],color="red",size=2) + labs(x = "Share of Trade", y = "Growth") 
+plot_withMarlainred # display plot
+```
+
+Malta is the red point on the scatter plot on the upper right coner of the graph. It look like an outlier because it's far distant from the other data (black points in graph).
+
+## --- c ---
+```{r}
+reg <- lm(growth$growth ~ growth$tradeshare)
+names(reg$coefficients) <- c("(Intercept)", "slope")
+print("Regression Summary");
+summary(reg) 
+```
+```{r}
+0.64 + 2.306*0.5
+0.64 + 2.306*1
+```
+
+The estimated slope is 2.306, and the estimated intercept is 0.64. When trade share is 0.5, the predicted growth rate for a country is  1.79. When trade share is 1, the predicted growth rate for a country is 2.95.
+
+## --- d ---
+```{r}
+growth_new <- growth[!growth$country_name == "Malta",]
+reg_withoutMalta <- lm(growth_new$growth ~ growth_new$tradeshare)
+names(reg_withoutMalta$coefficients) <- c("(Intercept)", "slope")
+print("Regression Summary");
+summary(reg_withoutMalta) 
+```
+```{r}
+0.957 + 1.681*0.5
+0.957 + 1.681*1
+```
+
+The estimated slope is 1.681, and the estimated intercept is 0.957.  When trade share is 1.8, the predicted growth rate for a country is  1.79. When trade share is 1, the predicted growth rate for a country is 2.64.
+
+## --- e ---
+```{r}
+plot_withregression <- plot + stat_smooth(method = "lm", fullrange = TRUE, size = 1.5, level=0)
+plot_withregression + labs(title = "Growth vs. Share of Trade (with all data)")
+```
+
+```{r}
+plot_withregression_withoutMarla <- ggplot(growth_new, aes(x = tradeshare, y = growth)) + geom_point()+ stat_smooth(method = "lm", fullrange = TRUE, size = 1.5, level=0) + labs(title = "Growth vs. Share of Trade (without Marla)" , x = "Share of Trade", y = "Growth") 
+plot_withregression_withoutMarla
+```
+
+The regression function that includes Malta is steeper than the regression function that excludes Malta, because the tradesare value for Malta is extremely high. This outlier wil drive up the slop of regression. 
+
+## --- f ---
+Malta is an island in the central Mediterranean between Sicily and the North African coast. The island a freight trans-shipment point. As a result, there are large amount of goods get shipped to Malta and get shipped out of Malta, leading to higher total number of import and export. In turn, the high sum of impot and export leads to large value of trade share. As an outlier, it should be excluded from the analysis.
+
+

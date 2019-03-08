@@ -1,0 +1,387 @@
+---
+title: "PS-5"
+author: "DanlingMa_XuyuanZhang_YunqiuLi"
+date: "11/19/2018"
+output:
+  html_document:
+    df_print: paged
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+remove(list = ls())
+#knitr::opts_knit$set(root.dir = getwd())
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org") 
+  library(tidyverse) 
+if(!require(knitr)) install.packages("knitr", repos = "http://cran.us.r-project.org")
+  library(knitr)
+if(!require(sandwich)) install.packages("sandwich", repos = "http://cran.us.r-project.org")
+  library(sandwich)
+if(!require(lmtest)) install.packages("lmtest", repos = "http://cran.us.r-project.org")
+  library(lmtest)
+if(!require(car)) install.packages("car", repos = "http://cran.us.r-project.org")
+  library(car)
+if(!require(stargazer)) install.packages("stargazer", repos = "http://cran.us.r-project.org")
+  library(stargazer)
+if(!require(plm)) install.packages("plm", repos = "http://cran.us.r-project.org")
+  library(plm)
+if(!require(AER)) install.packages("AER", repos = "http://cran.us.r-project.org")
+  library(AER)
+library(stargazer)
+
+# read in data
+employment_08_09 <- read.csv("employment_08_09.csv")
+employment_06_07 <- read.csv("employment_06_07.csv")
+```
+
+# Problem 5
+##a.
+What fraction of workers in the sample were employed in April 2009? 
+Use your answer to compute a 95% confidence interval for the probability that a worker was employed in April 2009, conditional on being employed in April 2008.
+```{r}
+employed_n = as.numeric(employment_08_09 %>% filter(employed == 1) %>% summarise(n=n()))
+total = employment_08_09 %>% summarise(n = n())
+fraction = as.numeric(employed_n/total)
+sprintf("About %s percent of workers in the sample were employed in April 2009.", round(fraction,3)*100)
+
+std <- function(x) sd(x)/sqrt(length(x))
+empl_std = std(employment_08_09$employed)
+CI = as.tibble(cbind(fraction - 1.96*empl_std, fraction + 1.96*empl_std))
+names(CI) <- c("CI lower", "CI upper")
+knitr::kable(CI, caption = "(1)95% confidence interval for the probability that a worker was employed in April 2009")
+```
+
+
+##b.
+Regress Employed on Age and Age2, using a linear probability model.
+
+### - i. 
+Based on this regression, was age a statistically significant determinant of employment in April 2009?
+```{r}
+employment_08_09$age_sq = employment_08_09$age * employment_08_09$age
+reg.11.1 = lm(employed ~ age + age_sq, data = employment_08_09)
+summary(reg.11.1)
+```
+  Yes. `Age` is significant at 99% level.
+
+### - ii. 
+Is there evidence of a nonlinear effect of age on the probability of being employed?
+```{r}
+age_20 = 0.3075 + 0.02827*20 - 0.0003266*20^2
+age_25 = 0.3075 + 0.02827*25 - 0.0003266*25^2
+  
+age_30 = 0.3075 + 0.02827*30 - 0.0003266*30^2
+age_35 = 0.3075 + 0.02827*35 - 0.0003266*35^2
+
+diff1 = age_25 - age_20
+diff2 = age_35 - age_30
+
+sprintf("With age increasing from 20 to 25, y increases by %s unit.", round(diff1,4))
+sprintf("With age increasing from 30 to 35, y increases by %s unit.", round(diff2,4))
+```
+  From above, we can see there is a nonlinear effect of age on the probability of being employed.
+
+### - iii. 
+Compute the predicted probability of employment for a 20-year-old worker, a 40-year-old worker, and a 60-year-old worker.
+```{r}
+age_20 = 0.3075 + 0.02827*20 - 0.0003266*20^2
+age_40 = 0.3075 + 0.02827*40 - 0.0003266*40^2
+age_60 = 0.3075 + 0.02827*60 - 0.0003266*60^2
+age_gap = rbind(`Age 20` = age_20, `Age 40` = age_40, `Age 60` = age_60)
+rownames(age_gap) = c("20","40","60")
+knitr::kable(age_gap, col.names = "Predicted probability")
+```
+
+##c.
+Repeat (b) using a probit regression.
+```{r}
+# Probit Regression
+reg.11.2 = glm(employed ~ age + age_sq, family = binomial(link = "probit"), data = employment_08_09)
+summary(reg.11.2)
+# Log likelihood value
+logLik(reg.11.2)
+# McFadden's Pseudo R-squared
+1-reg.11.2$deviance/reg.11.2$null.deviance
+coeftest(reg.11.2, vcov = vcovHC(reg.11.2, type = "HC1"))
+
+
+age_20 = -1.2579285 + 0.1217230*20 - 0.0014125*20^2
+age_25 = -1.2579285 + 0.1217230*25 - 0.0014125*25^2
+  
+age_30 = -1.2579285 + 0.1217230*30 - 0.0014125*30^2
+age_35 = -1.2579285 + 0.1217230*35 - 0.0014125*35^2
+
+diff1 = age_25 - age_20
+diff2 = age_35 - age_30
+
+sprintf("With age increasing from 20 to 25, y increases by %s unit.", round(diff1,4))
+sprintf("With age increasing from 30 to 35, y increases by %s unit.", round(diff2,4))
+
+age_20 = -1.2579285 + 0.1217230*20 - 0.0014125*20^2
+age_40 = -1.2579285 + 0.1217230*40 - 0.0014125*40^2
+age_60 = -1.2579285 + 0.1217230*60 - 0.0014125*60^2
+age_gap = rbind(`Age 20` = age_20, `Age 40` = age_40, `Age 60` = age_60)
+rownames(age_gap) = c("20","40","60")
+knitr::kable(age_gap, col.names = "Predicted probability")
+```
+  
+  Yes. `Age` is significant at 99% level.
+
+##d.
+Repeat (b) using a logit regression.
+```{r}
+# Logit Regression
+reg.11.3 = glm(employed ~ age + age_sq, family = binomial(link = "logit"), data = employment_08_09)
+summary(reg.11.3)
+# Log likelihood value
+logLik(reg.11.3)
+# McFadden's Pseudo R-squared
+1-reg.11.3$deviance/reg.11.3$null.deviance
+coeftest(reg.11.3, vcov = vcovHC(reg.11.3, type = "HC1"))
+
+
+age_20 = -2.48975412 + 0.22546624*20 - 0.00262366*20^2
+age_25 = -2.48975412 + 0.22546624*25 - 0.00262366*25^2
+  
+age_30 = -2.48975412 + 0.22546624*30 - 0.00262366*30^2
+age_35 = -2.48975412 + 0.22546624*35 - 0.00262366*35^2
+
+diff1 = age_25 - age_20
+diff2 = age_35 - age_30
+
+sprintf("With age increasing from 20 to 25, log_odds increases by %s unit.", round(diff1,4))
+sprintf("With age increasing from 30 to 35, log_odds increases by %s unit.", round(diff2,4))
+
+age_20 = -2.48975412 + 0.22546624*20 - 0.00262366*20^2
+age_40 = -2.48975412 + 0.22546624*40 - 0.00262366*40^2
+age_60 = -2.48975412 + 0.22546624*60 - 0.00262366*60^2
+age_gap = rbind(`Age 20` = age_20, `Age 40` = age_40, `Age 60` = age_60)
+rownames(age_gap) = c("20","40","60")
+knitr::kable(age_gap, col.names = "Predicted probability")
+```
+  
+  Yes. `Age` is significant at 99% level.
+
+##e.
+Are there important differences in your answers to (b)–(d)? Explain.
+  There is a difference between the result of linear-probability regression and the probit/logit regression, however, there is no difference between the result of probit and of logit regression. Because linear model is not proper when it comes to probability, the probability will exceed 1 or less than 0, which doesn't make sense. And the increase of the predictive variable is constant no matter where the base starts. But for probit/logit model, they fit probability properly, i.e. within 0 and 1, and the incremental change is not linear.
+  
+##f.
+The data set includes variables measuring the workers’ educational attainment, sex, race, marital status, region of the country, and weekly earnings in April 2008.
+
+### - i. 
+Construct a table like Table 11.2 to investigate whether the conclusions on the effect of age on employment from (b)–(d) are affected by omitted variable bias.
+
+```{r}
+# Eliminate multicollinearity
+reg.11.4 = glm(employed ~ . - race - unemployed - union - government - we_states - private - self - educ_adv + factor(race), family = binomial(link = "logit"), data = employment_08_09)
+summary(reg.11.4)
+```
+```{r, results = 'asis'}
+state_c_vcov.reg.11.1 <- vcovHC(reg.11.1, type = "HC1")
+reg.11.1.c <- coeftest(reg.11.1, vcov = state_c_vcov.reg.11.1)
+
+state_c_vcov.reg.11.2 <- vcovHC(reg.11.2, type = "HC1")
+reg.11.2.c <- coeftest(reg.11.2, vcov = state_c_vcov.reg.11.2)
+
+state_c_vcov.reg.11.3 <- vcovHC(reg.11.3, type = "HC1")
+reg.11.3.c <- coeftest(reg.11.3, vcov = state_c_vcov.reg.11.3)
+
+state_c_vcov.reg.11.4 <- vcovHC(reg.11.4, type = "HC1")
+reg.11.4.c <- coeftest(reg.11.4, vcov = state_c_vcov.reg.11.4)
+
+stargazer(reg.11.1, reg.11.2, reg.11.3, reg.11.4, type = 'html')  
+```
+  Yes. As we can see from above, the AIC decreases with adding in new variables, which means the latter regression is more precise. So the effect of age on employment are affected by omitted variable bias.
+
+### - ii.
+Use the regressions in your table to discuss the characteristics of workers who were hurt most by the Great Recession.
+Based on the above table, workers whose highest level of education is less than high school were hurt most by the Great Regression, because the negative effect of educ_lths is the greatest among all regressors.
+
+##g. 
+The results in (a)–(f) were based on the probability of employment. Workers who are not employed can either be 
+(i) unemployed or(ii) out the labor force. Do the conclusions you reached in (a)–(f) also hold for workers who became unemployed? (Hint: Use the binary variable Unemployed instead of Employed.)
+```{r}
+##a
+unemployed_n = as.numeric(employment_08_09 %>% filter(unemployed == 1) %>% summarise(n=n()))
+total = employment_08_09 %>% summarise(n = n())
+fraction = as.numeric(unemployed_n/total)
+sprintf("About %s percent of workers in the sample were not employed in April 2009.", round(fraction,3)*100)
+std <- function(x) sd(x)/sqrt(length(x))
+unempl_std = std(employment_08_09$unemployed)
+CI = as.tibble(cbind(fraction - 1.96*unempl_std, fraction + 1.96*unempl_std))
+names(CI) <- c("CI lower", "CI upper")
+knitr::kable(CI, caption = "(1)95% confidence interval for the probability that a worker was employed in April 2009")
+
+##b
+reg.11.1_1 = lm(unemployed ~ age + age_sq, data = employment_08_09)
+summary(reg.11.1_1)
+age_20 = 1.921e-01 + -7.028e-03*20 - 7.774e-05*20^2
+age_25 = 1.921e-01 + -7.028e-03*25 - 7.774e-05*25^2
+  
+age_30 = 1.921e-01 + -7.028e-03*30 - 7.774e-05*30^2
+age_35 = 1.921e-01 + -7.028e-03*35 - 7.774e-05*35^2
+
+diff1 = age_25 - age_20
+diff2 = age_35 - age_30
+
+sprintf("With age increasing from 20 to 25, y increases by %s unit.", round(diff1,4))
+sprintf("With age increasing from 30 to 35, y increases by %s unit.", round(diff2,4))
+
+age_40 = 1.921e-01 + -7.028e-03*40 - 7.774e-05*40^2
+age_60 = 1.921e-01 + -7.028e-03*60 - 7.774e-05*60^2
+age_gap = rbind(`Age 20` = age_20, `Age 40` = age_40, `Age 60` = age_60)
+rownames(age_gap) = c("20","40","60")
+knitr::kable(age_gap, col.names = "Predicted probability")
+
+##c
+# Probit Regression
+reg.11.2_1 = glm(unemployed ~ age + age_sq, family = binomial(link = "probit"), data = employment_08_09)
+summary(reg.11.2_1)
+# Log likelihood value
+logLik(reg.11.2_1)
+# McFadden's Pseudo R-squared
+1-reg.11.2_1$deviance/reg.11.2_1$null.deviance
+coeftest(reg.11.2_1, vcov = vcovHC(reg.11.2_1, type = "HC1"))
+
+
+age_20 = -0.34613923-0.06543469*20+0.00072746*20^2
+age_25 = -0.34613923-0.06543469*25+0.00072746*25^2
+  
+age_30 = -0.34613923-0.06543469*30+0.00072746*30^2
+age_35 = -0.34613923-0.06543469*35+0.00072746*35^2
+
+diff1 = age_25 - age_20
+diff2 = age_35 - age_30
+
+sprintf("With age increasing from 20 to 25, y increases by %s unit.", round(diff1,4))
+sprintf("With age increasing from 30 to 35, y increases by %s unit.", round(diff2,4))
+
+age_40 = -0.34613923-0.06543469*40+0.00072746*40^2
+age_60 = -0.34613923-0.06543469*60+0.00072746*60^2
+age_gap = rbind(`Age 20` = age_20, `Age 40` = age_40, `Age 60` = age_60)
+rownames(age_gap) = c("20","40","60")
+knitr::kable(age_gap, col.names = "Predicted probability")
+
+##d
+# Logit Regression
+reg.11.3_1 = glm(unemployed ~ age + age_sq, family = binomial(link = "logit"), data = employment_08_09)
+summary(reg.11.3_1)
+# Log likelihood value
+logLik(reg.11.3_1)
+# McFadden's Pseudo R-squared
+1-reg.11.3_1$deviance/reg.11.3_1$null.deviance
+coeftest(reg.11.3_1, vcov = vcovHC(reg.11.3_1, type = "HC1"))
+
+
+age_20 = -0.1421067 - 0.1417215*20 + 0.0015775*20^2
+age_25 = -0.1421067 - 0.1417215*25 + 0.0015775*25^2
+  
+age_30 = -0.1421067 - 0.1417215*30 + 0.0015775*30^2
+age_35 = -0.1421067 - 0.1417215*35 + 0.0015775*35^2
+
+diff1 = age_25 - age_20
+diff2 = age_35 - age_30
+
+sprintf("With age increasing from 20 to 25, log_odds increases by %s unit.", round(diff1,4))
+sprintf("With age increasing from 30 to 35, log_odds increases by %s unit.", round(diff2,4))
+
+age_40 = -0.1421067 - 0.1417215*40 + 0.0015775*40^2
+age_60 = -0.1421067 - 0.1417215*60 + 0.0015775*60^2
+age_gap = rbind(`Age 20` = age_20, `Age 40` = age_40, `Age 60` = age_60)
+rownames(age_gap) = c("20","40","60")
+knitr::kable(age_gap, col.names = "Predicted probability")
+
+##f
+# Eliminate multicollinearity
+reg.11.4_1 = glm(unemployed ~ . - race - employed - union - government - we_states - private - self - educ_adv + factor(race), family = binomial(link = "logit"), data = employment_08_09)
+summary(reg.11.4_1)
+```
+```{r, results = 'asis'}
+state_c_vcov.reg.11.1_1 <- vcovHC(reg.11.1_1, type = "HC1")
+reg.11.1.c <- coeftest(reg.11.1_1, vcov = state_c_vcov.reg.11.1_1)
+
+state_c_vcov.reg.11.2_1 <- vcovHC(reg.11.2_1, type = "HC1")
+reg.11.2.c <- coeftest(reg.11.2_1, vcov = state_c_vcov.reg.11.2_1)
+
+state_c_vcov.reg.11.3_1 <- vcovHC(reg.11.3_1, type = "HC1")
+reg.11.3.c <- coeftest(reg.11.3_1, vcov = state_c_vcov.reg.11.3_1)
+
+state_c_vcov.reg.11.4_1 <- vcovHC(reg.11.4_1, type = "HC1")
+reg.11.4.c <- coeftest(reg.11.4_1, vcov = state_c_vcov.reg.11.4_1)
+
+stargazer(reg.11.1_1, reg.11.2_1, reg.11.3_1, reg.11.4_1, type = 'html')  
+```
+  Yes. From AIC, using Unemployment instead, the (4) regression is still the most precise one with the lowest AIC.
+  
+##h. 
+These results have covered employment transitions during the Great Recession, but what about transitions during normal times? On the textbook website, you will find the data file Employment_06_07 , which measures the same variables but for the years 2006–2007. Analyze these data and comment on the differences in employment  transitions during recessions and normal times.
+```{r}
+reg.11.5 = glm(unemployed ~ . - race - employed - union - government - we_states - private - self - educ_adv + factor(race), family = binomial(link = "logit"), data = employment_06_07)
+summary(reg.11.5)
+```
+
+  There is a difference in employment transitions during recessions and normal times.
+  To be specific, during recessions, `age`, `married`, `ne_states`, `ce_states`, `educ_lths`, `educ_hs` and `female` are significant. However, during normal times, `earnwke`, `married`, `ce_states` and `female` are significant.
+  `Married` and `female` have a larger negative effect on employment during normal times. `ce_states` has a negative effect on employment during recesssions while it has a positive effect during normal times.
+  
+  
+# Problem 6
+## a.
+Regress weeksworked on the indicator variable morekids, using OLS. On average, do women with more than two children work less than women with two children? How much less?
+```{r}
+# read in 'fertility' dataset
+fertility <- read.csv("fertility.csv")
+# rename weeksm1 column to weeksworked
+fertility <- fertility %>% rename(weeksworked = weeksm1)
+reg_1 <- lm(weeksworked ~ morekids, data = fertility)
+coeftest(reg_1, vcov = vcovHC(reg_1, type = "HC1"))
+```
+On average, women with more than two children work around 5.39 weeks less than women with two childern.
+
+## b. 
+Explain why the OLS regression estimated in (a) is inappropriate for estimating the causal effect of fertility (morekids) on labor supply (weeksworked).
+First, there would be potential omitted variabe bias from a variable that is correlated
+with whether moms have more thant 2 kids(morekids) but is unobserved(for example: income). Also, there might be simultaneous causality bias because weeksworked may also determine whether a family wants more than 2 kids.
+
+## c.
+The data set contains the variable samesex, which is equal to 1 if the first two children are of the same sex (boy–boy or girl–girl) and equal to 0 otherwise. Are couples whose first two children are of the same sex more likely to have a third child? Is the effect large? Is it statistically significant?
+```{r}
+reg_2 <- lm(morekids ~ samesex, data = fertility)
+coeftest(reg_2, vcov = vcovHC(reg_2, type = "HC1"))
+```
+Based on the above regression result, couples whose first two children are of the same sex are more likely to have a third child because the coefficient for samesex is positive. The effect is not very large(0.068) and it is statistically significant at 1% level(t-value > 2.58).
+
+## d. 
+Explain why samesex is a valid instrument for the instrumental variable regression of weeksworked on morekids.
+```{r}
+# generate residual of regression 1
+ui <- residuals(reg_1)
+# generate the correlation coefficient between samesex and the residual
+cor(fertility$samesex, ui) 
+```
+samesex satisfies the two conditions for a valid instrument. First, based on result from c, we can conclude that there is correlation between morekids and samesex, so corr(Zi,Xi) ≠ 0. The instrument relevance condition is safisfied. 
+Second, it very likely that samesex is not correlated to factors other than morekids that would affect weeksworked. corr(Zi, ui) = -0.001 supports that. The instrument exogeneity condition is satisfied.
+
+## e. 
+Is samesex a weak instrument?
+```{r}
+reg_2 <- lm(morekids ~ samesex, data = fertility)
+linearHypothesis((reg_2), c("samesex=0"), white.adjust="hc1", test=c("F")) 
+```
+Samesex is not a week instrument, because the F-statistic derived from the first stage of two-stage least squares is 1238.2, which is way greater than 10.
+
+## f. 
+Estimate the regression of weeksworked on morekids, using samesex as an instrument. How large is the fertility effect on labor supply?
+```{r}
+reg_3 <- ivreg(weeksworked ~ morekids | samesex, data = fertility)
+coeftest(reg_3, vcov = vcovHC(reg_3, type = "HC1"))
+```
+The fiertility effect on labor supply is -6.31. In other words, on average, women with more than two children work around 6.31 weeks less than women with fewer childern.
+
+## g. 
+Do the results change when you include the variables agem1 , black, hispan, and othrace in the labor supply regression (treating these variable as exogenous)? Explain why or why not.
+```{r}
+reg_4 <- ivreg(weeksworked ~ morekids + agem1 + black + hispan + othrace| samesex + agem1 + black + hispan + othrace, data = fertility)
+coeftest(reg_4, vcov = vcovHC(reg_4, type = "HC1"))
+```
+The result changes when I include the variables agem1 , black, hispan, and othrace in the labor supply regression. Base on the new regression, on average, women with more than two children work around 5.82 weeks less than women with fewer childern. Because these included exogenous variables correct some of the omitted variable biase as they are included in the regression.

@@ -1,0 +1,298 @@
+---
+title: "PS4"
+author: "XuyuanZhang_YunqiuLi_DanlingMa"
+date: "11/6/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+remove(list = ls())
+
+knitr::opts_knit$set(root.dir = getwd())
+setwd("~/Desktop/Fall 2018/applied econometrics with R")
+
+library(tidyverse) # includes ggplot2 and many more useful libraries
+library(knitr)
+library(sandwich)
+library(lmtest)
+library(car) # use car package for linearHypothesis
+library(stargazer)
+library(plm)
+
+df_1 <- read.csv("guns.csv")
+df_1 <- df_1 %>% mutate(ln_vio = log(vio))
+```
+
+#10.1
+##a. Estimate (1) a regression of ln(vio) against shall and (2) a regression of ln(vio) against shall, incarc_rate, density, avginc, pop, pb1064, pw1064, and pm1029.
+```{r}
+reg_1 = lm(ln_vio ~ factor(shall), data = df_1)
+coeftest(reg_1, vcov = vcovHC(reg_1, type = "HC1"))
+summary(reg_1)
+
+reg_2 = lm(ln_vio ~ factor(shall) + incarc_rate + density + avginc + pop + pb1064 + pw1064 + pm1029, data = df_1) 
+coeftest(reg_2, vcov = vcovHC(reg_2, type = "HC1"))
+summary(reg_2)
+```
+###i. 
+**Interpret the coefficient on shall in regression (2). Is this estimate large or small in a “real-world” sense?**
+
+    Violent crime rate will decrease by 36.8% if the state has a shall-carry law in effect in that year. This estimate is large in a "real-world" sense since it can decrease violent crime rate by nearly 40%.
+
+###ii. 
+**Does adding the control variables in regression (2) change the estimated effect of a shall-carry law in regression (1) as measured by statistical significance? As measured by the “real-world” signifi- cance of the estimated coefficient?**
+
+    No. Both are statistically significant at 99% confidence level.
+    In regression (1), the shall-carry law could decrease violent crime rate by 44%. In regression (2), the shall-carry law could decrease violent crime rate by 36.8%.
+
+###iii. 
+**Suggest a variable that varies across states but plausibly varies little—or not at all—over time and that could cause omitted variable bias in regression (2).**
+
+    The "extent of strictness of whether a person should go to jail" varies across states, the higher the strictness is, the higher incarceration rate is. But it will relatively maintain stable across time.
+
+##b. Do the results change when you add fixed state effects? If so, which set of regression results is more credible, and why?
+```{r}
+# reg_1.2 = plm(ln_vio ~ factor(shall), data = df_1, index=c("stateid", "year"), model = "within")
+# summary(reg_1.2)
+# coeftest(reg_1.2, vcovHC(reg_1.2, type = 'HC1', cluster = 'group'))
+# #fixef(reg_1.2)
+
+reg_2.2 = plm(ln_vio ~ factor(shall) + incarc_rate + density + avginc + pop + pb1064 + pw1064 + pm1029, data = df_1, index=c("stateid","year"), model = "within")
+coeftest(reg_2.2, vcovHC(reg_2.2, type = 'HC1', cluster = 'group'))
+summary(reg_2.2)
+#fixef(reg_2.2)
+```
+
+    When we added in the fixed state effects, the coefficient of shall decreases from -0.368 to -0.046, which means crime rate only reduces by 4.6%. The coefficient of shall is still significant at 95% level with a t score of 2.31(>1.96). 
+    Moreover, incarceration rate is not significant when the fixed state effects were added. The effect on violent crimeof average income is negative and is not significant. Population become insignificant as well. The effect on crime rate of proportion of black and white populations increases and the proportion of male decreases violent crime.
+    The F-test is significant at 99% level. Hence the state fixed regression should be used.
+
+##c. Do the results change when you add fixed time effects? If so, which set of regression results is more credible, and why?
+```{r}
+# reg_1.3 = plm(ln_vio ~ factor(shall), data = df_1, index=c("year","stateid"), model = "within")
+# summary(reg_1.3)
+# coeftest(reg_1.3, vcovHC(reg_1.3, type = 'HC1', cluster = 'group'))
+#fixef(reg_1.3)
+
+reg_2.3 = plm(ln_vio ~ factor(shall) + incarc_rate + density + avginc + pop + pb1064 + pw1064 + pm1029 + factor(stateid) + factor(year), data = df_1, index=c("year","stateid"), model = "within")
+summary(reg_2.3)
+coeftest(reg_2.3, vcovHC(reg_2.3, type = 'HC1', cluster = 'group'))
+#fixef(reg_2.3)
+```
+    
+    After adding time effects, the coefficent of shall reduces to only -0.028, which is insignificant at the 90% level. So the shall carry laws have insignicicant effect on violent crime. However, the percentage of males is significant in a state. The F-test is significant, meaning there is a trend in time. So we should include time fixed effect.
+
+##d. Repeat the analysis using ln(rob) and ln(mur) in place of ln(vio).
+```{r, results = 'asis'}
+#ROB
+m.1 <- lm(log(rob) ~ factor(shall), data = df_1)
+state_c_vcov.m.1 <- vcovHC(m.1, type = "HC1")
+m.1.c <- coeftest(m.1, vcov = state_c_vcov.m.1)
+
+m.2 <- lm(log(rob) ~ factor(shall) + incarc_rate + density + avginc + pop + pb1064 + pw1064 + pm1029, data = df_1) 
+state_c_vcov.m.2 <- vcovHC(m.2, type = "HC1", cluster = "group")
+m.2.c <- coeftest(m.2, vcov = state_c_vcov.m.2)
+
+#time
+m.3 <- plm(log(rob) ~ factor(shall) + incarc_rate + density + avginc + pop + pb1064 + pw1064 + pm1029, data = df_1, index=c("year", "stateid"), model = "within")
+state_c_vcov.m.3 <- vcovHC(m.3, type = "HC1", cluster = "group")
+m.3.c <- coeftest(m.3, vcov = state_c_vcov.m.3)
+
+#state
+m.4 <- plm(log(rob) ~ factor(shall) + incarc_rate + density + avginc + pop + pb1064 + pw1064 + pm1029, data = df_1, index=c("stateid", "year"), model = "within")
+state_c_vcov.m.4 <- vcovHC(m.4, type = "HC1", cluster = "group")
+m.4.c <- coeftest(m.4, vcov = state_c_vcov.m.4)
+
+stargazer(m.1.c, m.2.c, m.3.c, m.4.c, type = 'html')
+```
+
+    The effects of the shall carry laws decrease as more terms are added and even becomes positive but insignificant when both state and time effects are in place.
+
+```{r}
+### Mur
+m.1 <- lm(log(mur) ~ factor(shall), data = df_1)
+state_c_vcov.m.1 <- vcovHC(m.1, type = "HC1")
+m.1.c <- coeftest(m.1, vcov = state_c_vcov.m.1)
+
+m.2 <- lm(log(mur) ~ factor(shall) + incarc_rate + density + avginc + pop + pb1064 + pw1064 + pm1029, data = df_1) 
+state_c_vcov.m.2 <- vcovHC(m.2, type = "HC1", cluster = "group")
+m.2.c <- coeftest(m.2, vcov = state_c_vcov.m.2)
+
+m.3 <- plm(log(mur) ~ factor(shall) + incarc_rate + density + avginc + pop + pb1064 + pw1064 + pm1029, data = df_1, index=c("year", "stateid"), model = "within")
+state_c_vcov.m.3 <- vcovHC(m.3, type = "HC1", cluster = "group")
+m.3.c <- coeftest(m.3, vcov = state_c_vcov.m.3)
+
+m.4 <-  plm(log(mur) ~ factor(shall) + incarc_rate + density + avginc + pop + pb1064 + pw1064 + pm1029, data = df_1, index=c("stateid", "year"), model = "within")
+state_c_vcov.m.4 <- vcovHC(m.4, type = "HC1", cluster = "group")
+m.4.c <- coeftest(m.4, vcov = state_c_vcov.m.4)
+
+stargazer(m.1.c, m.2.c, m.3.c, m.4.c, type = 'html')
+```
+
+    The effects of shall carry laws decreases as more terms are added and become insignificant on murder when both state and time effects are in place. 
+
+##e. In your view, what are the most important remaining threats to the internal validity of this regression analysis?
+
+    Different defination in state laws of robberies, murder, or violent crime may lead to measurement error in the regression. Besides, the higher the criminal rate, the higher the arrest rate. So there is also a simultaneous causality with the incarceration rate term.
+
+##f. Based on your analysis, what conclusions would you draw about the effects of concealed weapons laws on these crime rates?
+
+    The t-score of having shall carry law in for log of violent crime, murder, and robbery is not significant, which means having a shall-carry law would not decrease violent crime rate based on these data.
+
+#10.2
+##a. Is the data set a balanced panel? Explain.
+```{r, echo=FALSE}
+df_2 <- read.csv("~/Desktop/Fall 2018/applied econometrics with R/Income_Democracy.csv")
+#is.na.data.frame(df_2)
+```
+    
+    No. Because there are missing values for some of years and some of entities.
+
+##b. The index of political freedom/democracy is labeled Dem_ind.
+###i. What are the minimum and maximum values of Dem_ind in the data set? What are the mean and standard deviation of Dem_indin the data set? What are the 10th, 25th, 50th, 75th, and 90th percentiles of its distribution?
+```{r}
+big = max(df_2$dem_ind, na.rm = TRUE)
+small = min(df_2$dem_ind, na.rm = TRUE)
+avg = mean(df_2$dem_ind, na.rm = TRUE)
+std = sd(df_2$dem_ind, na.rm = TRUE)
+percentile = quantile(df_2$dem_ind, probs = c(0.1, 0.25, 0.5, 0.75, 0.9), na.rm = TRUE)
+
+sprintf("The maximum value of Dem_ind is %s", big)
+sprintf("The minimum value of Dem_ind is %s", small)
+sprintf("The mean of Dem_ind in the dataset is %s", avg)
+sprintf("The standard deviation of Dem_ind in the dataset is %s", std)
+percentile
+```
+
+    The 10th, 25th, 50th, 75th, and 90th percentiles of Dem_ind's distribution is 0, 0.17, 0.50, 0.83 and 1.
+
+###ii. What is the value of Dem_ind for the United States in 2000? Averaged over all years in the data set?
+```{r}
+df_2 %>% filter(year == 2000, country == 'United States') %>% select(dem_ind)
+df_2 %>% filter(country == 'United States') %>% summarise(mean(dem_ind))
+```
+    
+    The value of Dem_ind for the United States in 2000 is 1. The value of Dem_ind for the United States averaged over all years in 0.986.
+
+###iii. What is the value of Dem_ind for Libya in 2000? Averaged over all years in the data set?
+```{r}
+df_2 %>% filter(year == 2000, country == 'Libya') %>% select(dem_ind)
+df_2 %>% filter(country == 'Libya') %>% summarise(mean(dem_ind))
+```
+
+    The value of Dem_ind for Libya in 2000 is 0. The value of Dem_ind for Libya averaged over all years in 0.109.
+
+###iv. List five countries with an average value of Dem_ind greater than 0.95; less than 0.10; and between 0.3 and 0.7.
+```{r}
+df_2 %>% group_by(country) %>% summarise(`mean`=mean(dem_ind)) %>% filter(mean>0.95)
+df_2 %>% group_by(country) %>% summarise(`mean`=mean(dem_ind)) %>% filter(mean<0.10)
+df_2 %>% group_by(country) %>% summarise(`mean`=mean(dem_ind)) %>% filter(mean>0.3, mean<0.7)
+```
+
+    Australia, Austria, Barbados, Belgium and  Belize have an average value of Dem_ind > 0.95.
+    Afghanistan, Angola, Brunei, Burund and China have an average value of Dem_ind < 0.10.
+    Antigua, Argentina, Armenia, Bangladesh, Bolivia have an average value of Dem_ind between 0.3 and 0.7.
+
+##c. The logarithm of per capitaincome is labeled Log_GDPPC. Regress Dem_ind on Log_GDPPC. Use standard errors that are clustered by country.
+### i. How large is the estimated coefficient on Log_GDPPC? Is the coefficient statistically significant?
+```{r}
+#since the income and demographic variable are lagged five years, we build a new dataset.
+library(Hmisc)
+df_2$`log_gdppc_new` <- Lag(df_2$log_gdppc, -5)
+df_2$`log_pop_new` <- Lag(df_2$log_pop, -5)
+df_2$`edu_new` <- Lag(df_2$educ, -5)
+
+reg_2.c <- plm(dem_ind ~ log_gdppc_new, data = df_2, index=c("year", "country"), model = "within")
+summary(reg_2.c)
+coeftest(reg_2.c, vcovHC(reg_2.c, type = 'HC1', cluster = 'group'))
+fixef(reg_2.c)
+```
+    
+    The estimated coefficient on Log_GDPPC is 0.111384. Because the t-stat for the null hypothesis that the coefficient = 0 is 3.2592. Because 3.2592 > 1.96, we reject the null hypothesis at a 5% level. Therefore, the coefficient is statistically significant.
+
+###ii. If per capita income in a country increases by 20%, by how much is Dem_ind predicted to increase? What is a 95% confidence interval for the prediction? Is the predicted increase in Dem_ind large or small? (Explain what you mean by large or small.)
+```{r}
+CI1 = as.tibble(cbind(0.111384 - 1.96*0.034175, 0.111384 + 1.96*0.034175)); names(CI1) <- c("CI lower", "CI upper")
+knitr::kable(CI1, caption = "(1)95% confidence intervals for for the prediction")
+(0.111384*0.2)/0.034175
+```
+
+    If per capita income in a country increases by 20%, Dem_ind is predicted to increase 0.2*0.111384 = 0.0222768. The 95% confidence interval is [0.0444, 0.1783].Because the predicted increase in Dem_ind is 0.0222768, which is more than half of the standard deviation(0.034175), the predicted increase is not very small.
+
+
+###iii. Why is it important to use clustered standard errors for the regression? Do the results change if you do not use clustered standard errors?
+```{r}
+reg_2.c <- plm(dem_ind ~ log_gdppc_new, data = df_2, index=c("year", 'country'), model = "within")
+summary(reg_2.c)
+coeftest(reg_2.c, vcovHC(reg_2.c, type = 'HC1', cluster = 'group'))
+#fixef(reg_2.c)
+```
+
+    Clustered standard errors allow for heteroskedasticity and for arbitrary autocorrelation within an entity, but treat the errors as uncorrelated across entities. In the above regression, it's very like that the error term consists of time-varying factors that are determinants of Dem_ind but are not included as regressors, and some of these omitted factors might be autocorrelated. so the usual standard error would not be valid because it's derived under the false assumption of no serial correlation.  To see this, the clustered standard error for Dem_ind is 0.034175, whereas the unclustered standard error is smaller(0.011473), because it ignores the positive within-country correlation of the errors. If clustered standard error is not used, the standard error will be smaller and the confidence interval wil also be smaller.
+
+##d. 
+###i. Suggest a variable that varies across countries but plausibly varies little - or not at all - over time and that could cause omited variable bias in regression (c).
+
+    One of the variable could be religion, becuase religion varies across countries but it would have few or even no change over time. Also, it's very likely that the religion is corrlated with logarithm of real GDP per capita(log_gdppc) and can determine the index of democracy(dem_ind).
+
+###ii. Estimate the regression in (c), allowing for country fixed effects. How do your answers to (c)(i) and (c)(ii) change?
+```{r}
+reg_2.c <- plm(dem_ind ~ log_gdppc_new, data = df_2, index=c("country", "year"), model = "within")
+summary(reg_2.c)
+coeftest(reg_2.c, vcovHC(reg_2.c, type = 'HC1', cluster = 'group'))
+fixef(reg_2.c)
+CI1 = as.tibble(cbind(0.0012363 - 1.96*0.0152602, 0.0152602 + 1.96*0.0152602)); names(CI1) <- c("CI lower", "CI upper")
+knitr::kable(CI1, caption = "(1)95% confidence intervals for for the prediction")
+(0.0012363*0.2)/0.0012363
+```
+
+    If we estimate the regression in (c), allowing for country fixed effects instead of time fixed effects. The estimated coefficient on Log_GDPPC becomes way smaller of 0.0012363. Because the t-stat for the null hypothesis that the coefficient = 0 is 0.081. Because 0.081 < 1.96, we fail to reject the null hypothesis at a 5% level. Therefore, the coefficient is not statistically significant.
+    In this case, if per capita income in a country increases by 20%, Dem_ind is predicted to increase by 0.2*0.0012363 =0.00024726. Because the predicted increase in Dem_ind is 0.00024726, which is only one fifth of the standard deviation(0.0152602), the predicted increase is very small.
+    The 95% confidence interval for the coefficient is [-0.0287,0.0452].
+
+
+###iii. Exclude the data for Azerbaijan and rerun the regression. Do the results change? Why or why not?
+```{r}
+reg_2.d <- plm(dem_ind ~ log_gdppc_new, data = filter(df_2, country != 'Azerbaijan'), index=c("country", 'year'), model = "within")
+summary(reg_2.d)
+coeftest(reg_2.d, vcovHC(reg_2.d, type = 'HC1', cluster = 'group'))
+fixef(reg_2.d)
+```
+
+    The result for the regression does not change. Because there is only one year data for Azerbaijan(2000), so there is no entity fixed effect for it.
+
+###iv. Suggest a variable that varies over time but plausibly varies little—or not at all—across countries and that could cause omitted variable bias in the regression in (c).
+
+    One of the variable could be global advocate of democracy, becuase global advocate of democracy would have similar effect on all countries but would vary over time depend on the degree of advocation. Also, it's likely that the global advocate for democracy is corrlated with logarithm of real GDP per capita(log_gdppc) and can determine the index of democracy(dem_ind).
+
+###v. Estimate the regression in (c), allowing for time and country fixed effects. How do your answers to (c)(i) and (c)(ii) change?
+```{r}
+reg_2.d5 <- plm(dem_ind ~ log_gdppc_new + factor(country) + factor(year), data = df_2, index=c("country", "year"), model = "within")
+summary(reg_2.d5)
+coeftest(reg_2.d5, vcovHC(reg_2.d5, type = 'HC1', cluster = 'group'))
+fixef(reg_2.d5)
+0.2*0.0027357/0.0148821
+# 95% confidenct interval for coefficient on dem_ind
+CI2 = as.tibble(cbind(0.0027357 - 1.96*0.0148821, 0.0027357 + 1.96*0.0148821)); names(CI2) <- c("CI lower", "CI upper")
+knitr::kable(CI2, caption = "(1)95% confidence intervals for for the prediction")
+```
+
+    If we estimate the regression in (c), allowing for both country fixed effects and time fixed effects. The estimated coefficient on Log_GDPPC would be 0.0027357. Because the t-stat for the null hypothesis that the coefficient for log_GDPPC = 0 is 0.1838. Because 0.1838 < 1.96, we fail to reject the null hypothesis at a 5% level. Therefore, the coefficient is not statistically significant.
+    In this case, if per capita income in a country increases by 20%, Dem_ind is predicted to increase by 0.2*0.0027357 =0.00054714. Because the predicted increase in Dem_ind is 0.00054714, which is less than one twentieth of the standard deviation(0.0148821), the predicted increase is very small.
+    The 95% confidence interval for the coefficient(dem_ind) is [-0.0264,0.0149].
+
+###vi. There are addition demographic controls in the data set. Should these variables be included in the regression? If so, how do the results change when they are included?
+```{r}
+reg_2.d6 <- plm(dem_ind ~ log_gdppc_new + log_pop_new + edu_new + factor(country) + factor(year), data = df_2, index=c("country", "year"), model = "within")
+summary(reg_2.d6)
+coeftest(reg_2.d6, vcovHC(reg_2.d6, type = 'HC1', cluster = 'group'))
+#fixef(reg_2.d6)
+```
+
+    We probably should include educ and log_pop in the regression because fails to include these variables may generate omitted varaible bias. Toe see this, after we add the two varaibles to regression, the coefficient for log_gdppc_new decrease from 0.0012363 to 0.0065949. However, we don't need to add these two variables because the coefficients for these two variables are not statitically significant.
+
+##e. Based on your analysis, what conclusions do you draw about the effects of income on democracy?
+
+    Overall, income has a postiive effect on democracy as the coefficient for log_gdppc is always positive in the above regression. However, we find that the effect of income on democracy varies acorss time(year) but not varies across entity(country).

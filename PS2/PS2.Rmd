@@ -1,0 +1,151 @@
+---
+title: "Problem Set 2"
+author: "Written By Yunqiu (Julie) Li, in Autumn 2018"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE, warning = FALSE, echo = FALSE}
+knitr::opts_knit$set(root.dir = getwd())
+setwd("~/Desktop/Fall 2018/applied econometrics with R/")
+remove(list = ls())
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+  library(tidyverse)
+if(!require(knitr)) install.packages("knitr", repos = "http://cran.us.r-project.org")
+  library(knitr)
+if(!require(sandwich)) install.packages("sandwich", repos = "http://cran.us.r-project.org")
+  library(sandwich)
+if(!require(lmtest)) install.packages("lmtest", repos = "http://cran.us.r-project.org")
+  library(lmtest)
+# read in data: birthweight_smoking.csv
+birthweight_smoking <- read.csv("birthweight_smoking.csv")
+cps12 <- read.csv("cps12.csv")
+
+```
+
+## Question 5.3
+### a. 
+```{r}
+birthweight_smoking %>% summarise(avg_birthweight = mean(birthweight))
+birthweight_smoking %>% group_by(smoker) %>% summarise(average_birthweight = mean(birthweight))
+```
+The average value of birthweight for all mothers is 3382.93. For mothers who smoke, the average birthweight is 3178.83. For mothers who do not smoke, the average birthweight is 3432.06.
+
+### b. 
+```{r}
+birthweight_smoking %>% group_by(smoker) %>% summarise(mean(birthweight), sd(birthweight), n())
+mean_difference = 3178.832 - 3432.060
+mean_difference # print difference in mean
+se_difference = sqrt((580.0068)^2/582+(584.6211)^2/2418) # caculated based on table 1 below, difference in standard error = square root of (sd1^2/n1+sd2^2/n2)
+se_difference # print difference in standard error
+CI_lower = mean_difference - 1.96*se_difference
+CI_upper = mean_difference + 1.96*se_difference
+CI_lower # print lower confidence interval limit
+CI_upper # print upper confidence interval limit
+```
+The difference in average birthweight for smoking and non smoking mothers is -253.228. The standard error for estimated difference is 26.82. The 95% confidence interval for the difference in the average birth weight for smoking and nonsmoking mothers is [-305.7973, -200.6587].
+
+### c.
+```{r}
+# i.
+reg <- lm(birthweight ~ smoker, data = birthweight_smoking)
+coeftest(reg, vcov = vcovHC(reg, type = "HC1"))
+```
+The estimated slope is the difference in average birthweight for smoking and non smoking mothers, which is -253.228. The intercept is the average birthweight for nonsmoking mothers, which is 3432.06.
+
+ii. Even though the two standard errors computed for (b)(26.82) and (c)(26.81) are very close, these two value are related but different. The standard error in (b) is within birthweight for smoking and non-smoking mothers, which is one-dimensional. However, the standard error in (c) is the effect of smoking(a binary variable) on birthweight, which is two-dimensional. In other words, because smoker is a binary variable, the regression will automatically takes the difference for standard error of smoking mothers and nonsmoking mothers.
+
+
+```{r}
+# iii.
+CI_lower_2 = -253.228 - 1.96*26.810 # caculated based on result of regression generated above, CI = [mean - 1.96*se, mean + 1.96*se]
+CI_upper_2 = -253.228 + 1.96*26.810
+CI_lower_2 # print lower confidence interval limit
+CI_upper_2 # print upper confidence interval limit
+```
+The 95% confidence interval for the effect of smoking on birth weight is [-305.7756, -200.6804].
+
+### d.
+```{r}
+summary(reg)
+```
+
+The adjusted R-squared is 0.028 for the regression, which is very low, indicating that the sample data are not fitted to the regression line closely. In other words, smoking is likely to correlated with other factors that cause low birth weight, which leads to omitted variable bias. If a mother smokes, she may also have other unhealthy lifestyles that would affect Birthweight at the same time. Therefore, I thnk the regression error term would not have a conditional mean of zero, given Smoking(Xi).
+
+## Question 6.1
+### a. 
+```{r}
+reg <- lm(birthweight ~ smoker, data = birthweight_smoking)
+coeftest(reg, vcov = vcovHC(reg, type = "HC1"))
+```
+The estimated effect of smoking on birth weight is -253.228 grams. In other words, smoking would make birth weight drop 253.228 grams.
+
+### b. 
+```{r}
+#i.
+reg_2 <- lm(birthweight ~ smoker+alcohol+nprevist, data = birthweight_smoking)
+coeftest(reg_2, vcov = vcovHC(reg_2, type = "HC1"))
+```
+i. Exclusion of Alcohol and Nprevist could lead to omited variable bias. It is very like that Alcohol is correlated with smoke as people who drink may be more likely to smoke. Also, Alcohol could be a determinant of birth weight. Similar to the effect of smoking on birth weight, as mother drinks, birth weight may drop. There two conditions together would make omitted variable bias occur. Similarly, mothers who make more prenatal visits may be less likely to smoke(because they are more concerned about their babies' health condition), so Nprevist could be correlated with smoke. Nprevist could also be a determinant of birth weight. These two conditions together would also make omitted variable bias occur.
+
+```{r}
+# ii.
+## summary the two regression to compare adjusted R-squared
+summary(reg)
+summary(reg_2)
+```
+
+ii. The estimated effect of smoking on birth weight is substantially different from the regression that excludes Alcohol and Nprevist, because the coefficient for Smoker changes from -253.34(exclude Alcohol and Nprevist) to -217.58(include Alcohol and Nprevist). The regression in (a) seems to suffer from omitted variable bias as the adjusted R squred for regression (a) is very low(0.028). However, the adjusted R squred goes up to 0.07192 after including the two variables, indicating that regression (a) omits some important factors behind and regresssion (b) is relative a better estimor compared with regreassion (a).
+
+```{r}
+# iii.
+Predicted_birthweight = 3051.2486 - 217.5801*1 - 30.4913*0 + 34.0699*8 # caculate based on estimated coefficients from reg_2 above
+Predicted_birthweight # print value of predicted birthweight for this mother
+```
+
+iii. The predicted birth weight of Jane's child is 3106.228 grams.
+
+```{r}
+#iv.
+## use summary function to generate the R-squared and adjusted R-squared for 'reg_2'.
+summary(reg_2)
+```
+iv. The R-squared is 0.07285, and the adjusted R-squared is 0.07192. These two values are similar because the sample number(3000) is large enough so that the R-squared would approach adjusted R-squared.
+
+### c. 
+```{r}
+# step 1
+reg_x1_x2 <- lm(smoker~alcohol + nprevist, data = birthweight_smoking)
+residual_x1 = resid(reg_x1_x2)
+# step 2
+reg_y_x2 <- lm(birthweight~alcohol + nprevist, data = birthweight_smoking)
+residual_y = resid(reg_y_x2)
+# step 3
+lm(residual_y~residual_x1, data = birthweight_smoking)
+# print the value of coefficient generated by step 3
+-2.176e+02
+```
+Using the three-step process, the estimated coefficient for Smoking is -217.6, which is the same as 
+the estimated coefficient for Smoking that obtained in (b).
+
+### d. 
+```{r}
+reg_3 <- lm(birthweight~smoker+alcohol+tripre0+tripre2+tripre3, data = birthweight_smoking)
+coeftest(reg_3, vcov = vcovHC(reg_3, type = "HC1"))
+```
+i. Tripre1 is excluded from the regression because if all the variables Tripre0 through Tripre3 are included, the regressors will be perfect multicollinearity. If Tripre1 is included, the regression would fail.
+
+ii. The estimated coefficient on Tripre0 measures the average difference in birth weight between mothers who make no prenatal visits and who make prenatal visits. On average, the birth weight for children whose mother make no prenatal visits(tripre0 = 1) is 697.97 grams lower than the birth weight for children whose mother make prenatal visits(tripre0 = 0). 
+
+iii. The estimated coefficient on Tripre2 means that on average, the birth weight for children whose mother make the first prenatal visits in the 2nd trimester(tripre2 = 1) is 100.84 grams lower than the birth weight for children whose mother make the first prenatal visits in the 1st tremester(tripre1 = 1). 
+The estimated coefficient on Tripre3 means that on average, the birth weight for children whose mother make the first prenatal visits in the 3rd trimester (tripre3 = 1) is 136.96 grams lower than the birth weight for children whose mother make the first prenatal visits in the 3rd tremester(tripre1 = 1).
+
+```{r}
+# iv.
+# compute adjusted R-squared for two regression to compare adjusted R-squared
+summary(reg_3)
+summary(reg_2)
+```
+iv. The regession in (d) does not explain a larger fraction of the variance in birth weight than the regression in (b) because the adjusted R-squared for regression in (d)(0.045) is lower than the adjusted R-squared in (b)(0.072).
